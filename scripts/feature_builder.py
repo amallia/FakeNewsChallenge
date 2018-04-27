@@ -4,6 +4,7 @@ import sys
 
 import pandas as pd
 import spacy
+from spacy.symbols import nsubj, dobj, VERB
 
 from tqdm import tqdm
 
@@ -45,6 +46,7 @@ class FeatureBuilder:
             "doc_similarity",
             "word_overlap",
             "tfidf_cosine",
+            "dependency_similarity"
         ]
 
         # Build features
@@ -62,6 +64,29 @@ class FeatureBuilder:
         # Compute Hamming distance
         dist = hamming(stancevec.toarray(), bodyvec.toarray())
         self.feats.append(dist)
+
+    def dependency_similarity(self):
+        """
+        spaCy (nsubj, verb) and (verb, dobj) similarities
+        """
+        # Lemmatize
+        sset = set(tok.lemma_ for tok in self.nlpstance)
+        bset = set(tok.lemma_ for tok in self.nlpbody)
+        slist = []
+        # Extract stance dependencies
+        for tok in sset:
+            if tok.dep == nsubj or tok.dep_ == dobj:
+                if tok.head.pos_ == VERB:
+                    slist.append(tuple([tok.text, tok.head.text]))
+        # Extract body dependencies
+        blist = []
+        for tok in bset:
+            if tok.dep == nsubj or tok.dep == dobj:
+                if tok.head.pos == VERB:
+                    blist.append(tuple([tok.text, tok.head.text]))
+        # Compare stance vs. body
+        for pair in slist:
+            self.feats.append(1) if pair in blist else self.feats.append(0)
 
     def stance_polarity(self):
         """
